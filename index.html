@@ -603,9 +603,123 @@ function openCity(id) {
     </div>
     <div class="modal-note" style="margin-bottom:10px;"><strong>Visa path:</strong> ${c.visaNote}</div>
     <div class="modal-note" style="margin-bottom:10px;"><strong>Tax:</strong> ${c.taxNote}</div>
-    <div class="modal-note">${c.note}</div>
+    <div class="modal-note" style="margin-bottom:14px;">${c.note}</div>
+    <button class="form-btn" style="margin-bottom:12px;" onclick="openCityContribution('${c.id}', '${escHTML(c.name)}')">
+      ✦ Share your experience of ${c.name}
+    </button>
+    <div id="city-contribs" style="margin-top:12px;"></div>
   `;
   document.getElementById('modal-overlay').classList.add('on');
+  loadCityContributions(c.id);
+}
+
+async function loadCityContributions(cityId) {
+  const el = document.getElementById('city-contribs');
+  if (!el) return;
+  try {
+    const res = await apiFetch('/city-contribution?city_id=' + encodeURIComponent(cityId) + '&limit=20');
+    const data = await res.json();
+    const list = data.contributions || [];
+    const agg = data.aggregates;
+    if (!list.length) {
+      el.innerHTML = '<div style="color:var(--muted);font-size:12px;">No user reports yet. Be the first.</div>';
+      return;
+    }
+    const aggHtml = agg ? `
+      <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:4px 0 8px;">Averages from ${agg.count} user${agg.count>1?'s':''}</div>
+      <div class="modal-stats" style="margin-bottom:12px;">
+        ${agg.monthly != null ? `<div class="modal-stat"><div class="k">Actual monthly</div><div class="v">$ ${Math.round(agg.monthly).toLocaleString()}</div></div>` : ''}
+        ${agg.internet != null ? `<div class="modal-stat"><div class="k">Actual internet</div><div class="v">${Math.round(agg.internet)} Mbps</div></div>` : ''}
+        ${agg.rent_1br != null ? `<div class="modal-stat"><div class="k">Rent 1BR</div><div class="v">$ ${Math.round(agg.rent_1br).toLocaleString()}</div></div>` : ''}
+        ${agg.safety != null ? `<div class="modal-stat"><div class="k">Safety</div><div class="v">${agg.safety} / 10</div></div>` : ''}
+        ${agg.air_quality != null ? `<div class="modal-stat"><div class="k">Air quality</div><div class="v">${agg.air_quality} / 10</div></div>` : ''}
+        ${agg.food_scene != null ? `<div class="modal-stat"><div class="k">Food</div><div class="v">${agg.food_scene} / 10</div></div>` : ''}
+        ${agg.social_scene != null ? `<div class="modal-stat"><div class="k">Social</div><div class="v">${agg.social_scene} / 10</div></div>` : ''}
+        ${agg.coffee_scene != null ? `<div class="modal-stat"><div class="k">Coffee/cowork</div><div class="v">${agg.coffee_scene} / 10</div></div>` : ''}
+        ${agg.healthcare != null ? `<div class="modal-stat"><div class="k">Healthcare</div><div class="v">${agg.healthcare} / 10</div></div>` : ''}
+      </div>
+    ` : '';
+    const items = list.map(r => `
+      <div class="feedback-item" style="border-left-color:var(--amber);">
+        ${r.pros ? `<div><strong style="color:var(--green);">+</strong> ${escHTML(r.pros)}</div>` : ''}
+        ${r.cons ? `<div style="margin-top:4px;"><strong style="color:var(--red);">−</strong> ${escHTML(r.cons)}</div>` : ''}
+        <div class="who">— ${escHTML(r.username)} · ${r.stay_duration ? escHTML(r.stay_duration) + ' · ' : ''}${r.background ? escHTML(r.background) + ' · ' : ''}${new Date(r.created_at).toLocaleDateString()}</div>
+      </div>
+    `).join('');
+    el.innerHTML = aggHtml + items;
+  } catch { el.innerHTML = ''; }
+}
+
+function openCityContribution(cityId, cityName) {
+  if (!currentUser) { closeModal(); openAuth(); return; }
+  const el = document.getElementById('auth-modal');
+  el.innerHTML = `
+    <div class="modal-head">
+      <div>
+        <h2 style="margin:0;">${escHTML(cityName)} — share your experience</h2>
+        <div class="modal-sub">All fields optional. Fill in what you know.</div>
+      </div>
+      <button class="modal-close" onclick="closeAuth()">×</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div class="form-row" style="margin:0;"><label>Monthly cost ($)</label><input id="c-monthly" type="number" placeholder="2000" /></div>
+      <div class="form-row" style="margin:0;"><label>Internet (Mbps)</label><input id="c-internet" type="number" placeholder="100" /></div>
+      <div class="form-row" style="margin:0;"><label>Rent 1BR ($/mo)</label><input id="c-rent" type="number" placeholder="1200" /></div>
+    </div>
+    <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:12px 0 6px;">Rate each 1 (bad) → 10 (great)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div class="form-row" style="margin:0;"><label>Safety at night</label><input id="c-safety" type="number" min="1" max="10" /></div>
+      <div class="form-row" style="margin:0;"><label>Air quality</label><input id="c-air" type="number" min="1" max="10" /></div>
+      <div class="form-row" style="margin:0;"><label>Food scene</label><input id="c-food" type="number" min="1" max="10" /></div>
+      <div class="form-row" style="margin:0;"><label>Social / dating</label><input id="c-social" type="number" min="1" max="10" /></div>
+      <div class="form-row" style="margin:0;"><label>Coffee / cowork</label><input id="c-coffee" type="number" min="1" max="10" /></div>
+      <div class="form-row" style="margin:0;"><label>Healthcare</label><input id="c-healthcare" type="number" min="1" max="10" /></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div class="form-row" style="margin:0;">
+        <label>How long did you stay?</label>
+        <select id="c-duration" class="form-row" style="background:var(--surface-2);border:1px solid var(--border-2);color:var(--text);padding:10px 12px;border-radius:6px;font-family:inherit;font-size:13px;width:100%;">
+          <option value="">—</option><option value="visited">visited</option><option value="1-3mo">1-3 months</option><option value="3-12mo">3-12 months</option><option value="1y+">1+ year</option>
+        </select>
+      </div>
+      <div class="form-row" style="margin:0;">
+        <label>Status</label>
+        <select id="c-background" style="background:var(--surface-2);border:1px solid var(--border-2);color:var(--text);padding:10px 12px;border-radius:6px;font-family:inherit;font-size:13px;width:100%;">
+          <option value="">—</option><option value="solo">solo</option><option value="couple">couple</option><option value="family">with kids</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row"><label>What's great about it</label><textarea id="c-pros" rows="2" placeholder="Food, safety, coworking spaces, specific neighborhoods…"></textarea></div>
+    <div class="form-row"><label>What's bad about it</label><textarea id="c-cons" rows="2" placeholder="Traffic, bureaucracy, scams to avoid…"></textarea></div>
+    <button class="form-btn" onclick="submitCityContribution('${cityId}')">Submit experience</button>
+    <div class="form-status" id="c-status"></div>
+  `;
+  document.getElementById('auth-overlay').classList.add('on');
+}
+
+async function submitCityContribution(cityId) {
+  const status = document.getElementById('c-status');
+  status.textContent = 'Submitting…'; status.className = 'form-status';
+  const val = (id) => {
+    const v = document.getElementById(id)?.value;
+    return v === '' || v == null ? null : v;
+  };
+  const body = {
+    city_id: cityId,
+    monthly: val('c-monthly'), internet: val('c-internet'), rent_1br: val('c-rent'),
+    safety: val('c-safety'), air_quality: val('c-air'), food_scene: val('c-food'),
+    social_scene: val('c-social'), coffee_scene: val('c-coffee'), healthcare: val('c-healthcare'),
+    stay_duration: val('c-duration'), background: val('c-background'),
+    pros: val('c-pros'), cons: val('c-cons'),
+  };
+  const res = await apiFetch('/city-contribution', { method: 'POST', body: JSON.stringify(body) });
+  if (res.ok) {
+    status.textContent = 'Thanks — saved.'; status.className = 'form-status ok';
+    setTimeout(() => { closeAuth(); loadCityContributions(cityId); }, 700);
+  } else {
+    const d = await res.json();
+    status.textContent = d.error || 'Failed'; status.className = 'form-status err';
+  }
 }
 function closeModal() { document.getElementById('modal-overlay').classList.remove('on'); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
