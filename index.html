@@ -815,76 +815,12 @@ async function loadCityContributions(cityId) {
   } catch { el.innerHTML = ''; }
 }
 
+// Backwards compat shim — the "Share your experience of X" button in the city
+// detail modal still calls this. Just forwards to the unified form with the
+// city pre-filled.
 function openCityContribution(cityId, cityName) {
-  if (!currentUser) { closeModal(); openAuth(); return; }
-  const el = document.getElementById('auth-modal');
-  el.innerHTML = `
-    <div class="modal-head">
-      <div>
-        <h2 style="margin:0;">${escHTML(cityName)} — share your experience</h2>
-        <div class="modal-sub">All fields optional. Fill in what you know.</div>
-      </div>
-      <button class="modal-close" onclick="closeAuth()">×</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div class="form-row" style="margin:0;"><label>Monthly cost ($)</label><input id="c-monthly" type="number" placeholder="2000" /></div>
-      <div class="form-row" style="margin:0;"><label>Internet (Mbps)</label><input id="c-internet" type="number" placeholder="100" /></div>
-      <div class="form-row" style="margin:0;"><label>Rent 1BR ($/mo)</label><input id="c-rent" type="number" placeholder="1200" /></div>
-    </div>
-    <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:12px 0 6px;">Rate each 1 (bad) → 10 (great)</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div class="form-row" style="margin:0;"><label>Safety at night</label><input id="c-safety" type="number" min="1" max="10" /></div>
-      <div class="form-row" style="margin:0;"><label>Air quality</label><input id="c-air" type="number" min="1" max="10" /></div>
-      <div class="form-row" style="margin:0;"><label>Food scene</label><input id="c-food" type="number" min="1" max="10" /></div>
-      <div class="form-row" style="margin:0;"><label>Social / dating</label><input id="c-social" type="number" min="1" max="10" /></div>
-      <div class="form-row" style="margin:0;"><label>Coffee / cowork</label><input id="c-coffee" type="number" min="1" max="10" /></div>
-      <div class="form-row" style="margin:0;"><label>Healthcare</label><input id="c-healthcare" type="number" min="1" max="10" /></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div class="form-row" style="margin:0;">
-        <label>How long did you stay?</label>
-        <select id="c-duration" class="form-row" style="background:var(--surface-2);border:1px solid var(--border-2);color:var(--text);padding:10px 12px;border-radius:6px;font-family:inherit;font-size:13px;width:100%;">
-          <option value="">—</option><option value="visited">visited</option><option value="1-3mo">1-3 months</option><option value="3-12mo">3-12 months</option><option value="1y+">1+ year</option>
-        </select>
-      </div>
-      <div class="form-row" style="margin:0;">
-        <label>Status</label>
-        <select id="c-background" style="background:var(--surface-2);border:1px solid var(--border-2);color:var(--text);padding:10px 12px;border-radius:6px;font-family:inherit;font-size:13px;width:100%;">
-          <option value="">—</option><option value="solo">solo</option><option value="couple">couple</option><option value="family">with kids</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-row"><label>What's great about it</label><textarea id="c-pros" rows="2" placeholder="Food, safety, coworking spaces, specific neighborhoods…"></textarea></div>
-    <div class="form-row"><label>What's bad about it</label><textarea id="c-cons" rows="2" placeholder="Traffic, bureaucracy, scams to avoid…"></textarea></div>
-    <button class="form-btn" onclick="submitCityContribution('${cityId}')">Submit experience</button>
-    <div class="form-status" id="c-status"></div>
-  `;
-  document.getElementById('auth-overlay').classList.add('on');
-}
-
-async function submitCityContribution(cityId) {
-  const status = document.getElementById('c-status');
-  status.textContent = 'Submitting…'; status.className = 'form-status';
-  const val = (id) => {
-    const v = document.getElementById(id)?.value;
-    return v === '' || v == null ? null : v;
-  };
-  const body = {
-    city_id: cityId,
-    monthly: val('c-monthly'), internet: val('c-internet'), rent_1br: val('c-rent'),
-    safety: val('c-safety'), air_quality: val('c-air'), food_scene: val('c-food'),
-    social_scene: val('c-social'), coffee_scene: val('c-coffee'), healthcare: val('c-healthcare'),
-    stay_duration: val('c-duration'), background: val('c-background'),
-    pros: val('c-pros'), cons: val('c-cons'),
-  };
-  const res = await apiFetch('/city-contribution', { method: 'POST', body: JSON.stringify(body) });
-  if (res.ok) {
-    status.textContent = 'Thanks — saved.'; status.className = 'form-status ok';
-    setTimeout(() => { closeAuth(); loadCityContributions(cityId); }, 700);
-  } else {
-    const d = await res.json();
-    status.textContent = d.error || 'Failed'; status.className = 'form-status err';
-  }
+  const existing = CITIES.find(c => c.id === cityId);
+  openCityForm(existing || { id: cityId, name: cityName });
 }
 function closeModal() { document.getElementById('modal-overlay').classList.remove('on'); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
@@ -904,38 +840,79 @@ async function loadUserCities() {
   } catch {}
 }
 
-function openAddCity() {
-  if (!currentUser) { openAuth(); return; }
+// Climate category → 1-10 score (used by builderScore). Mild/warm reward
+// year-round comfort; cold and hot drop; tropical and dry sit in the middle.
+const CLIMATE_SCORE = { mild: 8, warm: 9, cold: 3, hot: 5, tropical: 6, dry: 6 };
+
+// Unified "fill out a city" form. If `prefilled` is passed, city/country/flag
+// are locked read-only and the submit writes a /city-contribution. If no
+// prefill, user picks the city from the world dropdown and submission writes
+// both /city (creates it in the list) and /city-contribution (the first
+// datapoint).
+function openCityForm(prefilled) {
+  if (!currentUser) { closeModal(); openAuth(); return; }
+  const existing = !!prefilled;
+  const title = existing ? `${prefilled.flag || ''} ${escHTML(prefilled.name)} — share your experience` : 'Add a city';
+  const subtitle = existing
+    ? 'Add a datapoint — fill in whatever you know.'
+    : 'A city missing from the list. Fill in what you know; others will add more over time.';
+
   const el = document.getElementById('auth-modal');
   el.innerHTML = `
     <div class="modal-head">
-      <div><h2 style="margin:0;">Add a city</h2>
-        <div class="modal-sub">Share one that's missing. Scored with the same formula.</div></div>
+      <div><h2 style="margin:0;">${title}</h2>
+        <div class="modal-sub">${subtitle}</div></div>
       <button class="modal-close" onclick="closeAuth()">×</button>
     </div>
-    <div class="form-row" style="grid-column:1/-1;">
+
+    ${existing ? '' : `
+    <div class="form-row">
       <label>City *</label>
-      <input id="nc-name" list="world-cities-list" placeholder="Start typing — country autofills" maxlength="48" autocomplete="off" oninput="autofillFromCity()" />
+      <input id="cf-name" list="world-cities-list" placeholder="Start typing — country autofills" maxlength="48" autocomplete="off" oninput="autofillFromCityForm()" />
       <datalist id="world-cities-list">
         ${WORLD_CITIES.map(c => `<option value="${c.n}">${c.c}</option>`).join('')}
       </datalist>
-      <div id="nc-city-hint" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
+      <div id="cf-city-hint" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <div class="form-row"><label>Country *</label><input id="nc-country" placeholder="autofills from city" maxlength="48" /></div>
-      <div class="form-row"><label>Flag emoji</label><input id="nc-flag" placeholder="autofills from city" maxlength="8" /></div>
+      <div class="form-row"><label>Country *</label><input id="cf-country" placeholder="autofills from city" maxlength="48" /></div>
+      <div class="form-row"><label>Flag emoji</label><input id="cf-flag" placeholder="autofills from city" maxlength="8" /></div>
+    </div>
+    `}
+
+    <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;">About you</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-row"><label>How long were you there</label>
+        <select id="cf-duration">
+          <option value="">—</option><option value="visited">visited</option><option value="1-3mo">1-3 months</option><option value="3-12mo">3-12 months</option><option value="1y+">1+ year</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Status</label>
+        <select id="cf-background">
+          <option value="">—</option><option value="solo">solo</option><option value="couple">couple</option><option value="family">with kids</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;">Hard numbers</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div class="form-row"><label>Monthly cost ($)${existing ? '' : ' *'}</label><input id="cf-monthly" type="number" placeholder="1500" /></div>
+      <div class="form-row"><label>Rent 1BR ($/mo)</label><input id="cf-rent" type="number" placeholder="1000" /></div>
+      <div class="form-row"><label>Internet (Mbps)${existing ? '' : ' *'}</label><input id="cf-internet" type="number" placeholder="100" /></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div class="form-row"><label>Visa path</label>
-        <select id="nc-visa">
+        <select id="cf-visa">
+          <option value="">—</option>
           <option value="easy">easy</option>
-          <option value="medium" selected>medium</option>
+          <option value="medium">medium</option>
           <option value="hard">hard</option>
         </select>
       </div>
-      <div class="form-row"><label>Monthly cost (USD) *</label><input id="nc-monthly" type="number" placeholder="1500" /></div>
-      <div class="form-row"><label>Internet (Mbps) *</label><input id="nc-internet" type="number" placeholder="100" /></div>
       <div class="form-row"><label>Climate</label>
-        <select id="nc-climate">
-          <option value="mild" selected>Mild — comfortable year-round</option>
+        <select id="cf-climate">
+          <option value="">—</option>
+          <option value="mild">Mild — comfortable year-round</option>
           <option value="warm">Warm — sunny most of the year</option>
           <option value="cold">Cold — long harsh winter</option>
           <option value="hot">Hot — brutal summers</option>
@@ -943,22 +920,39 @@ function openAddCity() {
           <option value="dry">Dry — arid, hot summers</option>
         </select>
       </div>
-      <div class="form-row"><label>Talent 1-10</label><input id="nc-talent" type="number" min="1" max="10" placeholder="6" /></div>
-      <div class="form-row"><label>Flight hub 1-10</label><input id="nc-hub" type="number" min="1" max="10" placeholder="6" /></div>
-      <div class="form-row"><label>English 1-10</label><input id="nc-english" type="number" min="1" max="10" placeholder="7" /></div>
     </div>
-    <div class="form-row"><label>Short note</label><textarea id="nc-note" placeholder="One sentence — why would a founder consider it?" maxlength="500"></textarea></div>
-    <button class="form-btn" onclick="submitUserCity()">Add city</button>
-    <div class="form-status" id="nc-status"></div>
+
+    <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;">Rate 1 (bad) → 10 (great)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div class="form-row"><label>Talent pool</label><input id="cf-talent" type="number" min="1" max="10" /></div>
+      <div class="form-row"><label>Flight hub</label><input id="cf-hub" type="number" min="1" max="10" /></div>
+      <div class="form-row"><label>English</label><input id="cf-english" type="number" min="1" max="10" /></div>
+      <div class="form-row"><label>Safety at night</label><input id="cf-safety" type="number" min="1" max="10" /></div>
+      <div class="form-row"><label>Air quality</label><input id="cf-air" type="number" min="1" max="10" /></div>
+      <div class="form-row"><label>Food scene</label><input id="cf-food" type="number" min="1" max="10" /></div>
+      <div class="form-row"><label>Social / dating</label><input id="cf-social" type="number" min="1" max="10" /></div>
+      <div class="form-row"><label>Coffee / cowork</label><input id="cf-coffee" type="number" min="1" max="10" /></div>
+      <div class="form-row"><label>Healthcare</label><input id="cf-healthcare" type="number" min="1" max="10" /></div>
+    </div>
+
+    <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px;">In your words</div>
+    <div class="form-row"><label>What's great about it</label><textarea id="cf-pros" rows="2" placeholder="Food, safety, coworking spaces, specific neighborhoods…"></textarea></div>
+    <div class="form-row"><label>What's bad about it</label><textarea id="cf-cons" rows="2" placeholder="Traffic, bureaucracy, scams to avoid…"></textarea></div>
+    <div class="form-row"><label>One-liner (optional)</label><input id="cf-note" placeholder="Why would a founder consider it?" maxlength="500" /></div>
+
+    <button class="form-btn" onclick="submitCityForm(${existing ? `'${prefilled.id}'` : 'null'})">${existing ? 'Submit experience' : 'Add city'}</button>
+    <div class="form-status" id="cf-status"></div>
   `;
   document.getElementById('auth-overlay').classList.add('on');
 }
 
-function autofillFromCity() {
-  const nameInput = document.getElementById('nc-name');
-  const countryInput = document.getElementById('nc-country');
-  const flagInput = document.getElementById('nc-flag');
-  const hint = document.getElementById('nc-city-hint');
+function openAddCity() { openCityForm(null); }
+
+function autofillFromCityForm() {
+  const nameInput = document.getElementById('cf-name');
+  const countryInput = document.getElementById('cf-country');
+  const flagInput = document.getElementById('cf-flag');
+  const hint = document.getElementById('cf-city-hint');
   const typed = nameInput.value.trim();
   const match = WORLD_CITY_LOOKUP[typed.toLowerCase()];
   if (match) {
@@ -966,7 +960,7 @@ function autofillFromCity() {
     if (!flagInput.value) flagInput.value = match.f;
     const existing = CITIES.find(c => c.name.toLowerCase() === typed.toLowerCase());
     if (existing) {
-      hint.textContent = `Already in the list — your submission will show as a duplicate.`;
+      hint.textContent = `Already in the list — picking "Share your experience" from the city would be cleaner.`;
       hint.style.color = 'var(--amber)';
     } else {
       hint.textContent = `${match.f} ${match.c} — autofilled.`;
@@ -977,32 +971,61 @@ function autofillFromCity() {
   }
 }
 
-// Climate label → 1-10 score (used by builderScore). Mild/warm reward year-round
-// comfort; cold and hot drop; tropical and dry sit in the middle.
-const CLIMATE_SCORE = { mild: 8, warm: 9, cold: 3, hot: 5, tropical: 6, dry: 6 };
-const CLIMATE_LABEL = { mild: 'Mild', warm: 'Warm', cold: 'Cold', hot: 'Hot', tropical: 'Tropical', dry: 'Dry' };
-
-async function submitUserCity() {
-  const status = document.getElementById('nc-status');
-  const v = id => document.getElementById(id).value.trim();
-  const climateKey = v('nc-climate');
-  const body = {
-    name: v('nc-name'), country: v('nc-country'), flag: v('nc-flag'),
-    visa: v('nc-visa'),
-    monthly: v('nc-monthly'), internet: v('nc-internet'),
-    talent: v('nc-talent'),
-    climate: CLIMATE_SCORE[climateKey] ?? 6,
-    hub: v('nc-hub'), english: v('nc-english'),
-    note: v('nc-note'),
+async function submitCityForm(existingCityId) {
+  const status = document.getElementById('cf-status');
+  const v = (id) => {
+    const el = document.getElementById(id);
+    const val = el ? el.value.trim() : '';
+    return val === '' ? null : val;
   };
-  if (!body.name || !body.country || !body.monthly || !body.internet) {
-    status.textContent = 'City, country, monthly, and internet are required.'; status.className = 'form-status err'; return;
+  let cityId = existingCityId;
+
+  // Create the city first if it's new, so we have an id to attach the
+  // contribution to.
+  if (!cityId) {
+    const name = v('cf-name'), country = v('cf-country'), flag = v('cf-flag');
+    const monthly = v('cf-monthly'), internet = v('cf-internet');
+    if (!name || !country || !monthly || !internet) {
+      status.textContent = 'City, country, monthly cost, and internet are required.';
+      status.className = 'form-status err';
+      return;
+    }
+    status.textContent = 'Adding city…'; status.className = 'form-status';
+    const climateKey = v('cf-climate');
+    const cityBody = {
+      name, country, flag,
+      visa: v('cf-visa') || 'medium',
+      monthly, internet,
+      talent: v('cf-talent'),
+      climate: climateKey ? CLIMATE_SCORE[climateKey] : null,
+      hub: v('cf-hub'), english: v('cf-english'),
+      note: v('cf-note'),
+    };
+    const cityRes = await apiFetch('/city', { method: 'POST', body: JSON.stringify(cityBody) });
+    const cityData = await cityRes.json();
+    if (!cityRes.ok) {
+      status.textContent = cityData.error || 'Failed to add city';
+      status.className = 'form-status err';
+      return;
+    }
+    cityId = cityData.id;  // e.g. "uc-7"
   }
+
+  // Always write a /city-contribution so the datapoint shows up in the aggregates.
   status.textContent = 'Saving…'; status.className = 'form-status';
-  const res = await apiFetch('/city', { method: 'POST', body: JSON.stringify(body) });
+  const contribBody = {
+    city_id: cityId,
+    monthly: v('cf-monthly'), internet: v('cf-internet'), rent_1br: v('cf-rent'),
+    safety: v('cf-safety'), air_quality: v('cf-air'), food_scene: v('cf-food'),
+    social_scene: v('cf-social'), coffee_scene: v('cf-coffee'), healthcare: v('cf-healthcare'),
+    stay_duration: v('cf-duration'), background: v('cf-background'),
+    pros: v('cf-pros'), cons: v('cf-cons'),
+  };
+  const res = await apiFetch('/city-contribution', { method: 'POST', body: JSON.stringify(contribBody) });
   if (res.ok) {
-    status.textContent = 'Added. Reloading…'; status.className = 'form-status ok';
-    await loadUserCities();
+    status.textContent = 'Thanks — saved.'; status.className = 'form-status ok';
+    if (!existingCityId) await loadUserCities();
+    else loadCityContributions(existingCityId);
     setTimeout(() => closeAuth(), 700);
   } else {
     const d = await res.json();
