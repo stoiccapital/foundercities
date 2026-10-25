@@ -140,6 +140,12 @@
   }
   tbody tr:hover { background: rgba(255,255,255,0.02); }
   tbody tr:last-child { border-bottom: none; }
+  tbody tr.just-added { animation: fadeHighlight 2.6s ease-out; }
+  @keyframes fadeHighlight {
+    0%   { background: rgba(245, 158, 11, 0.35); }
+    15%  { background: rgba(245, 158, 11, 0.35); }
+    100% { background: transparent; }
+  }
   tbody td { padding: 12px 14px; vertical-align: middle; }
   tbody td.num { text-align: right; font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
 
@@ -1024,8 +1030,23 @@ async function submitCityForm(existingCityId) {
   const res = await apiFetch('/city-contribution', { method: 'POST', body: JSON.stringify(contribBody) });
   if (res.ok) {
     status.textContent = 'Thanks — saved.'; status.className = 'form-status ok';
-    if (!existingCityId) await loadUserCities();
-    else loadCityContributions(existingCityId);
+    if (!existingCityId) {
+      await loadUserCities();
+      // Scroll to and briefly highlight the new row so the user sees where
+      // it landed in the ranking.
+      requestAnimationFrame(() => {
+        const row = Array.from(document.querySelectorAll('#tbody tr')).find(
+          r => r.getAttribute('onclick') && r.getAttribute('onclick').includes(`'${cityId}'`)
+        );
+        if (row) {
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          row.classList.add('just-added');
+          setTimeout(() => row.classList.remove('just-added'), 2600);
+        }
+      });
+    } else {
+      loadCityContributions(existingCityId);
+    }
     setTimeout(() => closeAuth(), 700);
   } else {
     const d = await res.json();
