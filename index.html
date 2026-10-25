@@ -516,6 +516,105 @@ CITIES.forEach(c => {
   c.visaScore = visaScore(c.visa);
 });
 
+// ---- World cities lookup (for the Add-a-city dropdown autofill) ----
+// Compact {name, country, flag} list used in the add-city form so picking
+// a city autofills country + flag. Covers common founder/nomad destinations.
+const WORLD_CITIES = [
+  // Europe
+  {n:'Lisbon',c:'Portugal',f:'🇵🇹'},{n:'Porto',c:'Portugal',f:'🇵🇹'},{n:'Madeira',c:'Portugal',f:'🇵🇹'},
+  {n:'Madrid',c:'Spain',f:'🇪🇸'},{n:'Barcelona',c:'Spain',f:'🇪🇸'},{n:'Valencia',c:'Spain',f:'🇪🇸'},{n:'Seville',c:'Spain',f:'🇪🇸'},{n:'Málaga',c:'Spain',f:'🇪🇸'},{n:'Palma',c:'Spain',f:'🇪🇸'},{n:'Las Palmas',c:'Spain',f:'🇪🇸'},{n:'Tenerife',c:'Spain',f:'🇪🇸'},{n:'Granada',c:'Spain',f:'🇪🇸'},
+  {n:'Berlin',c:'Germany',f:'🇩🇪'},{n:'Hamburg',c:'Germany',f:'🇩🇪'},{n:'Munich',c:'Germany',f:'🇩🇪'},{n:'Frankfurt',c:'Germany',f:'🇩🇪'},{n:'Cologne',c:'Germany',f:'🇩🇪'},{n:'Düsseldorf',c:'Germany',f:'🇩🇪'},{n:'Stuttgart',c:'Germany',f:'🇩🇪'},{n:'Leipzig',c:'Germany',f:'🇩🇪'},
+  {n:'London',c:'UK',f:'🇬🇧'},{n:'Edinburgh',c:'UK',f:'🇬🇧'},{n:'Manchester',c:'UK',f:'🇬🇧'},{n:'Bristol',c:'UK',f:'🇬🇧'},{n:'Cambridge',c:'UK',f:'🇬🇧'},{n:'Oxford',c:'UK',f:'🇬🇧'},
+  {n:'Paris',c:'France',f:'🇫🇷'},{n:'Lyon',c:'France',f:'🇫🇷'},{n:'Marseille',c:'France',f:'🇫🇷'},{n:'Nice',c:'France',f:'🇫🇷'},{n:'Bordeaux',c:'France',f:'🇫🇷'},{n:'Toulouse',c:'France',f:'🇫🇷'},
+  {n:'Amsterdam',c:'Netherlands',f:'🇳🇱'},{n:'Rotterdam',c:'Netherlands',f:'🇳🇱'},{n:'The Hague',c:'Netherlands',f:'🇳🇱'},{n:'Utrecht',c:'Netherlands',f:'🇳🇱'},{n:'Eindhoven',c:'Netherlands',f:'🇳🇱'},
+  {n:'Brussels',c:'Belgium',f:'🇧🇪'},{n:'Antwerp',c:'Belgium',f:'🇧🇪'},{n:'Ghent',c:'Belgium',f:'🇧🇪'},
+  {n:'Zürich',c:'Switzerland',f:'🇨🇭'},{n:'Zug',c:'Switzerland',f:'🇨🇭'},{n:'Geneva',c:'Switzerland',f:'🇨🇭'},{n:'Basel',c:'Switzerland',f:'🇨🇭'},{n:'Bern',c:'Switzerland',f:'🇨🇭'},{n:'Lausanne',c:'Switzerland',f:'🇨🇭'},{n:'Lugano',c:'Switzerland',f:'🇨🇭'},
+  {n:'Vienna',c:'Austria',f:'🇦🇹'},{n:'Salzburg',c:'Austria',f:'🇦🇹'},{n:'Graz',c:'Austria',f:'🇦🇹'},{n:'Innsbruck',c:'Austria',f:'🇦🇹'},
+  {n:'Rome',c:'Italy',f:'🇮🇹'},{n:'Milan',c:'Italy',f:'🇮🇹'},{n:'Florence',c:'Italy',f:'🇮🇹'},{n:'Venice',c:'Italy',f:'🇮🇹'},{n:'Turin',c:'Italy',f:'🇮🇹'},{n:'Naples',c:'Italy',f:'🇮🇹'},{n:'Bologna',c:'Italy',f:'🇮🇹'},
+  {n:'Athens',c:'Greece',f:'🇬🇷'},{n:'Thessaloniki',c:'Greece',f:'🇬🇷'},{n:'Crete',c:'Greece',f:'🇬🇷'},
+  {n:'Dublin',c:'Ireland',f:'🇮🇪'},{n:'Cork',c:'Ireland',f:'🇮🇪'},{n:'Galway',c:'Ireland',f:'🇮🇪'},
+  {n:'Prague',c:'Czechia',f:'🇨🇿'},{n:'Brno',c:'Czechia',f:'🇨🇿'},
+  {n:'Warsaw',c:'Poland',f:'🇵🇱'},{n:'Krakow',c:'Poland',f:'🇵🇱'},{n:'Wrocław',c:'Poland',f:'🇵🇱'},{n:'Gdańsk',c:'Poland',f:'🇵🇱'},{n:'Poznań',c:'Poland',f:'🇵🇱'},
+  {n:'Budapest',c:'Hungary',f:'🇭🇺'},
+  {n:'Bucharest',c:'Romania',f:'🇷🇴'},{n:'Cluj-Napoca',c:'Romania',f:'🇷🇴'},{n:'Timișoara',c:'Romania',f:'🇷🇴'},
+  {n:'Sofia',c:'Bulgaria',f:'🇧🇬'},{n:'Plovdiv',c:'Bulgaria',f:'🇧🇬'},
+  {n:'Belgrade',c:'Serbia',f:'🇷🇸'},{n:'Novi Sad',c:'Serbia',f:'🇷🇸'},
+  {n:'Zagreb',c:'Croatia',f:'🇭🇷'},{n:'Split',c:'Croatia',f:'🇭🇷'},{n:'Dubrovnik',c:'Croatia',f:'🇭🇷'},{n:'Rijeka',c:'Croatia',f:'🇭🇷'},
+  {n:'Ljubljana',c:'Slovenia',f:'🇸🇮'},
+  {n:'Tallinn',c:'Estonia',f:'🇪🇪'},{n:'Riga',c:'Latvia',f:'🇱🇻'},{n:'Vilnius',c:'Lithuania',f:'🇱🇹'},{n:'Kaunas',c:'Lithuania',f:'🇱🇹'},
+  {n:'Stockholm',c:'Sweden',f:'🇸🇪'},{n:'Gothenburg',c:'Sweden',f:'🇸🇪'},{n:'Malmö',c:'Sweden',f:'🇸🇪'},
+  {n:'Copenhagen',c:'Denmark',f:'🇩🇰'},{n:'Aarhus',c:'Denmark',f:'🇩🇰'},
+  {n:'Oslo',c:'Norway',f:'🇳🇴'},{n:'Bergen',c:'Norway',f:'🇳🇴'},
+  {n:'Helsinki',c:'Finland',f:'🇫🇮'},{n:'Tampere',c:'Finland',f:'🇫🇮'},
+  {n:'Reykjavik',c:'Iceland',f:'🇮🇸'},
+  {n:'Kyiv',c:'Ukraine',f:'🇺🇦'},{n:'Lviv',c:'Ukraine',f:'🇺🇦'},
+  {n:'Tbilisi',c:'Georgia',f:'🇬🇪'},{n:'Batumi',c:'Georgia',f:'🇬🇪'},
+  {n:'Yerevan',c:'Armenia',f:'🇦🇲'},
+  // North America
+  {n:'San Francisco',c:'USA',f:'🇺🇸'},{n:'New York City',c:'USA',f:'🇺🇸'},{n:'Los Angeles',c:'USA',f:'🇺🇸'},{n:'Seattle',c:'USA',f:'🇺🇸'},{n:'Boston',c:'USA',f:'🇺🇸'},{n:'Austin',c:'USA',f:'🇺🇸'},{n:'Miami',c:'USA',f:'🇺🇸'},
+  {n:'Chicago',c:'USA',f:'🇺🇸'},{n:'Denver',c:'USA',f:'🇺🇸'},{n:'Portland',c:'USA',f:'🇺🇸'},{n:'San Diego',c:'USA',f:'🇺🇸'},{n:'Nashville',c:'USA',f:'🇺🇸'},{n:'Atlanta',c:'USA',f:'🇺🇸'},{n:'Dallas',c:'USA',f:'🇺🇸'},{n:'Houston',c:'USA',f:'🇺🇸'},{n:'Philadelphia',c:'USA',f:'🇺🇸'},{n:'Washington DC',c:'USA',f:'🇺🇸'},{n:'Minneapolis',c:'USA',f:'🇺🇸'},{n:'San Jose',c:'USA',f:'🇺🇸'},{n:'Raleigh',c:'USA',f:'🇺🇸'},{n:'Phoenix',c:'USA',f:'🇺🇸'},{n:'Honolulu',c:'USA',f:'🇺🇸'},{n:'Las Vegas',c:'USA',f:'🇺🇸'},{n:'Salt Lake City',c:'USA',f:'🇺🇸'},
+  {n:'Toronto',c:'Canada',f:'🇨🇦'},{n:'Montreal',c:'Canada',f:'🇨🇦'},{n:'Vancouver',c:'Canada',f:'🇨🇦'},{n:'Ottawa',c:'Canada',f:'🇨🇦'},{n:'Calgary',c:'Canada',f:'🇨🇦'},{n:'Edmonton',c:'Canada',f:'🇨🇦'},{n:'Quebec City',c:'Canada',f:'🇨🇦'},{n:'Halifax',c:'Canada',f:'🇨🇦'},
+  {n:'Mexico City',c:'Mexico',f:'🇲🇽'},{n:'Guadalajara',c:'Mexico',f:'🇲🇽'},{n:'Monterrey',c:'Mexico',f:'🇲🇽'},{n:'Playa del Carmen',c:'Mexico',f:'🇲🇽'},{n:'Cancun',c:'Mexico',f:'🇲🇽'},{n:'Tulum',c:'Mexico',f:'🇲🇽'},{n:'Puerto Vallarta',c:'Mexico',f:'🇲🇽'},{n:'Oaxaca',c:'Mexico',f:'🇲🇽'},{n:'Mérida',c:'Mexico',f:'🇲🇽'},
+  // Latin America
+  {n:'Buenos Aires',c:'Argentina',f:'🇦🇷'},{n:'Córdoba',c:'Argentina',f:'🇦🇷'},
+  {n:'São Paulo',c:'Brazil',f:'🇧🇷'},{n:'Rio de Janeiro',c:'Brazil',f:'🇧🇷'},{n:'Florianópolis',c:'Brazil',f:'🇧🇷'},{n:'Brasília',c:'Brazil',f:'🇧🇷'},{n:'Curitiba',c:'Brazil',f:'🇧🇷'},
+  {n:'Santiago',c:'Chile',f:'🇨🇱'},{n:'Valparaíso',c:'Chile',f:'🇨🇱'},
+  {n:'Lima',c:'Peru',f:'🇵🇪'},{n:'Cusco',c:'Peru',f:'🇵🇪'},
+  {n:'Bogotá',c:'Colombia',f:'🇨🇴'},{n:'Medellín',c:'Colombia',f:'🇨🇴'},{n:'Cartagena',c:'Colombia',f:'🇨🇴'},{n:'Cali',c:'Colombia',f:'🇨🇴'},
+  {n:'Quito',c:'Ecuador',f:'🇪🇨'},{n:'Guayaquil',c:'Ecuador',f:'🇪🇨'},
+  {n:'La Paz',c:'Bolivia',f:'🇧🇴'},
+  {n:'Montevideo',c:'Uruguay',f:'🇺🇾'},
+  {n:'Panama City',c:'Panama',f:'🇵🇦'},
+  {n:'San José',c:'Costa Rica',f:'🇨🇷'},
+  // Asia
+  {n:'Tokyo',c:'Japan',f:'🇯🇵'},{n:'Osaka',c:'Japan',f:'🇯🇵'},{n:'Kyoto',c:'Japan',f:'🇯🇵'},{n:'Fukuoka',c:'Japan',f:'🇯🇵'},{n:'Yokohama',c:'Japan',f:'🇯🇵'},{n:'Sapporo',c:'Japan',f:'🇯🇵'},
+  {n:'Seoul',c:'South Korea',f:'🇰🇷'},{n:'Busan',c:'South Korea',f:'🇰🇷'},{n:'Jeju',c:'South Korea',f:'🇰🇷'},
+  {n:'Taipei',c:'Taiwan',f:'🇹🇼'},{n:'Kaohsiung',c:'Taiwan',f:'🇹🇼'},
+  {n:'Hong Kong',c:'Hong Kong',f:'🇭🇰'},
+  {n:'Singapore',c:'Singapore',f:'🇸🇬'},
+  {n:'Bangkok',c:'Thailand',f:'🇹🇭'},{n:'Chiang Mai',c:'Thailand',f:'🇹🇭'},{n:'Phuket',c:'Thailand',f:'🇹🇭'},{n:'Koh Samui',c:'Thailand',f:'🇹🇭'},{n:'Pattaya',c:'Thailand',f:'🇹🇭'},
+  {n:'Ho Chi Minh',c:'Vietnam',f:'🇻🇳'},{n:'Hanoi',c:'Vietnam',f:'🇻🇳'},{n:'Da Nang',c:'Vietnam',f:'🇻🇳'},{n:'Hoi An',c:'Vietnam',f:'🇻🇳'},
+  {n:'Bali',c:'Indonesia',f:'🇮🇩'},{n:'Jakarta',c:'Indonesia',f:'🇮🇩'},{n:'Yogyakarta',c:'Indonesia',f:'🇮🇩'},
+  {n:'Kuala Lumpur',c:'Malaysia',f:'🇲🇾'},{n:'Penang',c:'Malaysia',f:'🇲🇾'},
+  {n:'Manila',c:'Philippines',f:'🇵🇭'},{n:'Cebu',c:'Philippines',f:'🇵🇭'},{n:'Siargao',c:'Philippines',f:'🇵🇭'},
+  {n:'Phnom Penh',c:'Cambodia',f:'🇰🇭'},{n:'Siem Reap',c:'Cambodia',f:'🇰🇭'},
+  {n:'Vientiane',c:'Laos',f:'🇱🇦'},{n:'Luang Prabang',c:'Laos',f:'🇱🇦'},
+  {n:'Yangon',c:'Myanmar',f:'🇲🇲'},
+  {n:'Mumbai',c:'India',f:'🇮🇳'},{n:'Delhi',c:'India',f:'🇮🇳'},{n:'Bangalore',c:'India',f:'🇮🇳'},{n:'Chennai',c:'India',f:'🇮🇳'},{n:'Hyderabad',c:'India',f:'🇮🇳'},{n:'Pune',c:'India',f:'🇮🇳'},{n:'Goa',c:'India',f:'🇮🇳'},{n:'Jaipur',c:'India',f:'🇮🇳'},
+  {n:'Colombo',c:'Sri Lanka',f:'🇱🇰'},
+  {n:'Kathmandu',c:'Nepal',f:'🇳🇵'},{n:'Pokhara',c:'Nepal',f:'🇳🇵'},
+  {n:'Dhaka',c:'Bangladesh',f:'🇧🇩'},
+  {n:'Islamabad',c:'Pakistan',f:'🇵🇰'},{n:'Karachi',c:'Pakistan',f:'🇵🇰'},{n:'Lahore',c:'Pakistan',f:'🇵🇰'},
+  {n:'Shanghai',c:'China',f:'🇨🇳'},{n:'Beijing',c:'China',f:'🇨🇳'},{n:'Shenzhen',c:'China',f:'🇨🇳'},{n:'Guangzhou',c:'China',f:'🇨🇳'},{n:'Chengdu',c:'China',f:'🇨🇳'},{n:'Hangzhou',c:'China',f:'🇨🇳'},
+  // Middle East
+  {n:'Dubai',c:'UAE',f:'🇦🇪'},{n:'Abu Dhabi',c:'UAE',f:'🇦🇪'},
+  {n:'Doha',c:'Qatar',f:'🇶🇦'},
+  {n:'Riyadh',c:'Saudi Arabia',f:'🇸🇦'},{n:'Jeddah',c:'Saudi Arabia',f:'🇸🇦'},
+  {n:'Kuwait City',c:'Kuwait',f:'🇰🇼'},
+  {n:'Muscat',c:'Oman',f:'🇴🇲'},
+  {n:'Manama',c:'Bahrain',f:'🇧🇭'},
+  {n:'Tel Aviv',c:'Israel',f:'🇮🇱'},{n:'Jerusalem',c:'Israel',f:'🇮🇱'},
+  {n:'Istanbul',c:'Turkey',f:'🇹🇷'},{n:'Ankara',c:'Turkey',f:'🇹🇷'},{n:'Antalya',c:'Turkey',f:'🇹🇷'},{n:'Izmir',c:'Turkey',f:'🇹🇷'},
+  {n:'Amman',c:'Jordan',f:'🇯🇴'},
+  {n:'Beirut',c:'Lebanon',f:'🇱🇧'},
+  // Africa
+  {n:'Cape Town',c:'South Africa',f:'🇿🇦'},{n:'Johannesburg',c:'South Africa',f:'🇿🇦'},{n:'Durban',c:'South Africa',f:'🇿🇦'},
+  {n:'Nairobi',c:'Kenya',f:'🇰🇪'},{n:'Mombasa',c:'Kenya',f:'🇰🇪'},
+  {n:'Lagos',c:'Nigeria',f:'🇳🇬'},{n:'Abuja',c:'Nigeria',f:'🇳🇬'},
+  {n:'Cairo',c:'Egypt',f:'🇪🇬'},{n:'Alexandria',c:'Egypt',f:'🇪🇬'},
+  {n:'Marrakech',c:'Morocco',f:'🇲🇦'},{n:'Casablanca',c:'Morocco',f:'🇲🇦'},{n:'Rabat',c:'Morocco',f:'🇲🇦'},{n:'Tangier',c:'Morocco',f:'🇲🇦'},
+  {n:'Dakar',c:'Senegal',f:'🇸🇳'},
+  {n:'Accra',c:'Ghana',f:'🇬🇭'},
+  {n:'Addis Ababa',c:'Ethiopia',f:'🇪🇹'},
+  {n:'Kigali',c:'Rwanda',f:'🇷🇼'},
+  {n:'Dar es Salaam',c:'Tanzania',f:'🇹🇿'},{n:'Zanzibar',c:'Tanzania',f:'🇹🇿'},
+  {n:'Mauritius',c:'Mauritius',f:'🇲🇺'},
+  // Oceania
+  {n:'Sydney',c:'Australia',f:'🇦🇺'},{n:'Melbourne',c:'Australia',f:'🇦🇺'},{n:'Brisbane',c:'Australia',f:'🇦🇺'},{n:'Perth',c:'Australia',f:'🇦🇺'},{n:'Adelaide',c:'Australia',f:'🇦🇺'},{n:'Gold Coast',c:'Australia',f:'🇦🇺'},
+  {n:'Auckland',c:'New Zealand',f:'🇳🇿'},{n:'Wellington',c:'New Zealand',f:'🇳🇿'},{n:'Christchurch',c:'New Zealand',f:'🇳🇿'},
+];
+const WORLD_CITY_LOOKUP = Object.fromEntries(WORLD_CITIES.map(c => [c.n.toLowerCase(), c]));
+
 // ---- User-submitted cities (merged in from API) ----
 // Row from /cities uses snake_case; normalise to the same shape as CITIES so
 // render, sort, and openCity() all keep working without special-casing.
@@ -814,10 +913,17 @@ function openAddCity() {
         <div class="modal-sub">Share one that's missing. Scored with the same formula.</div></div>
       <button class="modal-close" onclick="closeAuth()">×</button>
     </div>
+    <div class="form-row" style="grid-column:1/-1;">
+      <label>City *</label>
+      <input id="nc-name" list="world-cities-list" placeholder="Start typing — country autofills" maxlength="48" autocomplete="off" oninput="autofillFromCity()" />
+      <datalist id="world-cities-list">
+        ${WORLD_CITIES.map(c => `<option value="${c.n}">${c.c}</option>`).join('')}
+      </datalist>
+      <div id="nc-city-hint" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <div class="form-row"><label>City *</label><input id="nc-name" placeholder="e.g. Porto" maxlength="48" /></div>
-      <div class="form-row"><label>Country *</label><input id="nc-country" placeholder="e.g. Portugal" maxlength="48" /></div>
-      <div class="form-row"><label>Flag emoji</label><input id="nc-flag" placeholder="🇵🇹" maxlength="8" /></div>
+      <div class="form-row"><label>Country *</label><input id="nc-country" placeholder="autofills from city" maxlength="48" /></div>
+      <div class="form-row"><label>Flag emoji</label><input id="nc-flag" placeholder="autofills from city" maxlength="8" /></div>
       <div class="form-row"><label>Visa path</label>
         <select id="nc-visa">
           <option value="easy">easy</option>
@@ -841,6 +947,29 @@ function openAddCity() {
     <div class="form-status" id="nc-status"></div>
   `;
   document.getElementById('auth-overlay').classList.add('on');
+}
+
+function autofillFromCity() {
+  const nameInput = document.getElementById('nc-name');
+  const countryInput = document.getElementById('nc-country');
+  const flagInput = document.getElementById('nc-flag');
+  const hint = document.getElementById('nc-city-hint');
+  const typed = nameInput.value.trim();
+  const match = WORLD_CITY_LOOKUP[typed.toLowerCase()];
+  if (match) {
+    if (!countryInput.value) countryInput.value = match.c;
+    if (!flagInput.value) flagInput.value = match.f;
+    const existing = CITIES.find(c => c.name.toLowerCase() === typed.toLowerCase());
+    if (existing) {
+      hint.textContent = `Already in the list — your submission will show as a duplicate.`;
+      hint.style.color = 'var(--amber)';
+    } else {
+      hint.textContent = `${match.f} ${match.c} — autofilled.`;
+      hint.style.color = 'var(--muted)';
+    }
+  } else {
+    hint.textContent = '';
+  }
 }
 
 async function submitUserCity() {
