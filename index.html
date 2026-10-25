@@ -243,17 +243,92 @@
   }
   footer a { color: var(--muted); text-decoration: none; border-bottom: 1px dotted var(--muted); }
   footer a:hover { color: var(--text); }
+
+  /* ===== Auth / Feedback ===== */
+  .user-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 7px 14px;
+    border-radius: 7px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .user-chip:hover { border-color: var(--border-2); }
+  .user-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+  .user-chip.anon .dot { background: var(--muted); }
+
+  .modal-tab-row { display: flex; gap: 2px; margin-bottom: 16px; background: var(--surface-2); padding: 3px; border-radius: 7px; }
+  .modal-tab-row button { background: none; border: none; color: var(--muted); flex: 1; padding: 8px; border-radius: 5px; font-family: inherit; font-size: 12px; cursor: pointer; font-weight: 500; letter-spacing: 0.03em; }
+  .modal-tab-row button.on { background: var(--accent); color: #0a0a0a; font-weight: 600; }
+
+  .form-row { margin-bottom: 12px; }
+  .form-row label { display: block; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .form-row input, .form-row textarea {
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .form-row textarea { resize: vertical; min-height: 90px; }
+  .form-row input:focus, .form-row textarea:focus { outline: none; border-color: var(--text); }
+
+  .form-btn {
+    width: 100%;
+    padding: 11px;
+    background: var(--accent);
+    color: #0a0a0a;
+    border: none;
+    border-radius: 7px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+  }
+  .form-btn:hover { opacity: 0.9; }
+  .form-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .form-status { font-size: 11px; color: var(--muted); min-height: 14px; margin-top: 10px; }
+  .form-status.ok { color: var(--green); }
+  .form-status.err { color: var(--red); }
+
+  .feedback-list { margin-top: 16px; max-height: 260px; overflow-y: auto; }
+  .feedback-item {
+    background: var(--surface-2);
+    border-left: 2px solid var(--blue);
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .feedback-item .who { color: var(--muted); font-size: 11px; margin-top: 4px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <div class="title">Builder Cities</div>
-    <h1>Where should a solo founder live?</h1>
-    <div class="subtitle">
-      Cities ranked for independent builders — visa path, cost of living, internet, tax,
-      community, climate. Opinionated. No ads. Updated as the world changes.
+  <header style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+    <div>
+      <div class="title">Builder Cities</div>
+      <h1>Where should a solo founder live?</h1>
+      <div class="subtitle">
+        Cities ranked for independent builders — visa path, cost of living, internet, tax,
+        community, climate. Opinionated. No ads. Updated as the world changes.
+      </div>
     </div>
+    <button id="user-chip" class="user-chip anon" onclick="openAuth()">
+      <span class="dot"></span>
+      <span id="user-label">Sign in</span>
+    </button>
   </header>
 
   <div class="filters">
@@ -309,6 +384,10 @@
 
 <div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modal"></div>
+</div>
+
+<div class="modal-overlay" id="auth-overlay" onclick="if(event.target===this)closeAuth()">
+  <div class="modal" id="auth-modal"></div>
 </div>
 
 <script>
@@ -532,6 +611,157 @@ function closeModal() { document.getElementById('modal-overlay').classList.remov
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
 render();
+
+// ========= Auth + Feedback =========
+const AUTH_API = 'https://stoic-auth.hoangcn25.workers.dev';
+const PROJECT = 'founder-cities';
+let currentUser = null;
+let authTab = 'login';
+
+async function apiFetch(path, opts = {}) {
+  return fetch(AUTH_API + path, {
+    ...opts,
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  });
+}
+
+async function refreshMe() {
+  try {
+    const res = await apiFetch('/me');
+    if (res.ok) currentUser = await res.json();
+    else currentUser = null;
+  } catch { currentUser = null; }
+  renderUserChip();
+}
+
+function renderUserChip() {
+  const chip = document.getElementById('user-chip');
+  const label = document.getElementById('user-label');
+  if (currentUser) {
+    chip.classList.remove('anon');
+    label.textContent = currentUser.username;
+  } else {
+    chip.classList.add('anon');
+    label.textContent = 'Sign in';
+  }
+}
+
+function openAuth() {
+  if (currentUser) openFeedback();
+  else { authTab = 'login'; renderAuthModal(); document.getElementById('auth-overlay').classList.add('on'); }
+}
+function closeAuth() { document.getElementById('auth-overlay').classList.remove('on'); }
+
+function renderAuthModal() {
+  const el = document.getElementById('auth-modal');
+  const isLogin = authTab === 'login';
+  el.innerHTML = `
+    <div class="modal-head">
+      <div><h2 style="margin:0;">${isLogin ? 'Welcome back' : 'Create account'}</h2>
+        <div class="modal-sub">Needed to leave feedback — nothing else is stored.</div></div>
+      <button class="modal-close" onclick="closeAuth()">×</button>
+    </div>
+    <div class="modal-tab-row">
+      <button class="${isLogin ? 'on' : ''}" onclick="setAuthTab('login')">Login</button>
+      <button class="${!isLogin ? 'on' : ''}" onclick="setAuthTab('register')">Register</button>
+    </div>
+    ${!isLogin ? `
+      <div class="form-row"><label>Username</label><input id="auth-username" placeholder="your_handle" maxlength="24" /></div>
+    ` : ''}
+    <div class="form-row"><label>Email</label><input id="auth-email" type="email" placeholder="you@example.com" /></div>
+    <div class="form-row"><label>Password${!isLogin ? ' (8+ chars)' : ''}</label><input id="auth-password" type="password" /></div>
+    <button class="form-btn" onclick="${isLogin ? 'doLogin()' : 'doRegister()'}">${isLogin ? 'Login' : 'Create account'}</button>
+    <div class="form-status" id="auth-status"></div>
+  `;
+}
+function setAuthTab(tab) { authTab = tab; renderAuthModal(); }
+
+async function doLogin() {
+  const status = document.getElementById('auth-status');
+  status.textContent = 'Signing in…'; status.className = 'form-status';
+  const email = document.getElementById('auth-email').value;
+  const password = document.getElementById('auth-password').value;
+  const res = await apiFetch('/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+  const data = await res.json();
+  if (res.ok) { currentUser = data; renderUserChip(); closeAuth(); openFeedback(); }
+  else { status.textContent = data.error || 'Failed'; status.className = 'form-status err'; }
+}
+
+async function doRegister() {
+  const status = document.getElementById('auth-status');
+  status.textContent = 'Creating…'; status.className = 'form-status';
+  const username = document.getElementById('auth-username').value;
+  const email = document.getElementById('auth-email').value;
+  const password = document.getElementById('auth-password').value;
+  const res = await apiFetch('/register', { method: 'POST', body: JSON.stringify({ username, email, password }) });
+  const data = await res.json();
+  if (res.ok) { currentUser = data; renderUserChip(); closeAuth(); openFeedback(); }
+  else { status.textContent = data.error || 'Failed'; status.className = 'form-status err'; }
+}
+
+async function doLogout() {
+  await apiFetch('/logout', { method: 'POST' });
+  currentUser = null;
+  renderUserChip();
+  closeAuth();
+}
+
+async function openFeedback() {
+  const el = document.getElementById('auth-modal');
+  el.innerHTML = `
+    <div class="modal-head">
+      <div><h2 style="margin:0;">Leave feedback</h2>
+        <div class="modal-sub">Logged in as <strong>${escHTML(currentUser.username)}</strong> · <a href="#" onclick="doLogout();return false;" style="color:var(--muted);text-decoration:underline;">log out</a></div></div>
+      <button class="modal-close" onclick="closeAuth()">×</button>
+    </div>
+    <div class="form-row">
+      <label>What should change / what's missing / what did you like?</label>
+      <textarea id="fb-text" placeholder="Pick a city to add, a weight to tune, a visa rule that's wrong, anything…"></textarea>
+    </div>
+    <button class="form-btn" onclick="doFeedback()">Send feedback</button>
+    <div class="form-status" id="fb-status"></div>
+    <div class="feedback-list" id="feedback-list"><div style="color:var(--muted);font-size:12px;">Loading…</div></div>
+  `;
+  document.getElementById('auth-overlay').classList.add('on');
+  loadFeedback();
+}
+
+async function doFeedback() {
+  const status = document.getElementById('fb-status');
+  const text = document.getElementById('fb-text').value.trim();
+  if (!text) { status.textContent = 'Write something first.'; status.className = 'form-status err'; return; }
+  status.textContent = 'Sending…'; status.className = 'form-status';
+  const res = await apiFetch('/feedback', { method: 'POST', body: JSON.stringify({ project: PROJECT, text }) });
+  if (res.ok) {
+    document.getElementById('fb-text').value = '';
+    status.textContent = 'Thanks — saved.'; status.className = 'form-status ok';
+    loadFeedback();
+  } else {
+    const d = await res.json();
+    status.textContent = d.error || 'Failed'; status.className = 'form-status err';
+  }
+}
+
+async function loadFeedback() {
+  const el = document.getElementById('feedback-list');
+  if (!el) return;
+  try {
+    const res = await apiFetch('/feedback?project=' + encodeURIComponent(PROJECT) + '&limit=20');
+    const list = await res.json();
+    if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:12px;margin-top:10px;">No feedback yet. Be the first.</div>'; return; }
+    el.innerHTML = '<div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px;">Recent feedback</div>' + list.map(f => `
+      <div class="feedback-item">
+        ${escHTML(f.text)}
+        <div class="who">— ${escHTML(f.username)} · ${new Date(f.created_at).toLocaleDateString()}</div>
+      </div>
+    `).join('');
+  } catch { el.innerHTML = '<div style="color:var(--red);font-size:12px;">Could not load feedback.</div>'; }
+}
+
+function escHTML(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+refreshMe();
 </script>
 </body>
 </html>
