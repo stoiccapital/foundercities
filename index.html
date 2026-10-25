@@ -590,8 +590,8 @@ function openCity(id) {
       <button class="modal-close" onclick="closeModal()">×</button>
     </div>
     <div class="modal-stats">
-      <div class="modal-stat"><div class="k">Monthly cost</div><div class="v">$ ${c.monthly.toLocaleString()}</div></div>
-      <div class="modal-stat"><div class="k">Internet</div><div class="v">${c.internet} Mbps</div></div>
+      <div class="modal-stat"><div class="k">Monthly cost</div><div class="v" style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;"><span>$ ${c.monthly.toLocaleString()}<span style="color:var(--muted);font-size:10px;margin-left:3px;">est</span></span><span id="monthly-median" style="color:var(--amber);font-size:13px;"></span></div></div>
+      <div class="modal-stat"><div class="k">Internet</div><div class="v" style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;"><span>${c.internet} Mbps<span style="color:var(--muted);font-size:10px;margin-left:3px;">est</span></span><span id="internet-median" style="color:var(--amber);font-size:13px;"></span></div></div>
       <div class="modal-stat"><div class="k">Corporate tax</div><div class="v">${c.taxCorporate} %</div></div>
       <div class="modal-stat"><div class="k">Personal tax</div><div class="v">${c.taxPersonalMin === c.taxPersonalMax ? c.taxPersonalMax + ' %' : c.taxPersonalMin + '–' + c.taxPersonalMax + ' %'}</div></div>
       <div class="modal-stat"><div class="k">Visa</div><div class="v"><span class="pill visa-${c.visa}">${c.visa}</span></div></div>
@@ -621,15 +621,20 @@ async function loadCityContributions(cityId) {
     const data = await res.json();
     const list = data.contributions || [];
     const agg = data.aggregates;
+    // Inject median into the main modal-stats grid (next to the research estimate)
+    if (agg) {
+      const mm = document.getElementById('monthly-median');
+      if (mm && agg.monthly != null) mm.innerHTML = `$ ${Math.round(agg.monthly).toLocaleString()}<span style="color:var(--muted);font-size:10px;margin-left:3px;">median</span>`;
+      const im = document.getElementById('internet-median');
+      if (im && agg.internet != null) im.innerHTML = `${Math.round(agg.internet)} Mbps<span style="color:var(--muted);font-size:10px;margin-left:3px;">median</span>`;
+    }
     if (!list.length) {
       el.innerHTML = '<div style="color:var(--muted);font-size:12px;">No user reports yet. Be the first.</div>';
       return;
     }
     const aggHtml = agg ? `
-      <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:4px 0 8px;">Averages from ${agg.count} user${agg.count>1?'s':''}</div>
+      <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:4px 0 8px;">Medians from ${agg.count} user${agg.count>1?'s':''}</div>
       <div class="modal-stats" style="margin-bottom:12px;">
-        ${agg.monthly != null ? `<div class="modal-stat"><div class="k">Actual monthly</div><div class="v">$ ${Math.round(agg.monthly).toLocaleString()}</div></div>` : ''}
-        ${agg.internet != null ? `<div class="modal-stat"><div class="k">Actual internet</div><div class="v">${Math.round(agg.internet)} Mbps</div></div>` : ''}
         ${agg.rent_1br != null ? `<div class="modal-stat"><div class="k">Rent 1BR</div><div class="v">$ ${Math.round(agg.rent_1br).toLocaleString()}</div></div>` : ''}
         ${agg.safety != null ? `<div class="modal-stat"><div class="k">Safety</div><div class="v">${agg.safety} / 10</div></div>` : ''}
         ${agg.air_quality != null ? `<div class="modal-stat"><div class="k">Air quality</div><div class="v">${agg.air_quality} / 10</div></div>` : ''}
