@@ -933,12 +933,17 @@ function openAddCity() {
       </div>
       <div class="form-row"><label>Monthly cost (USD) *</label><input id="nc-monthly" type="number" placeholder="1500" /></div>
       <div class="form-row"><label>Internet (Mbps) *</label><input id="nc-internet" type="number" placeholder="100" /></div>
-      <div class="form-row"><label>Corporate tax %</label><input id="nc-taxcorp" type="number" step="0.1" placeholder="21" /></div>
-      <div class="form-row"><label>Personal tax min %</label><input id="nc-taxpmin" type="number" step="0.1" placeholder="14" /></div>
-      <div class="form-row"><label>Personal tax max %</label><input id="nc-taxpmax" type="number" step="0.1" placeholder="48" /></div>
+      <div class="form-row"><label>Climate</label>
+        <select id="nc-climate">
+          <option value="mild" selected>Mild — comfortable year-round</option>
+          <option value="warm">Warm — sunny most of the year</option>
+          <option value="cold">Cold — long harsh winter</option>
+          <option value="hot">Hot — brutal summers</option>
+          <option value="tropical">Tropical — hot + humid</option>
+          <option value="dry">Dry — arid, hot summers</option>
+        </select>
+      </div>
       <div class="form-row"><label>Talent 1-10</label><input id="nc-talent" type="number" min="1" max="10" placeholder="6" /></div>
-      <div class="form-row"><label>Community 1-10</label><input id="nc-community" type="number" min="1" max="10" placeholder="6" /></div>
-      <div class="form-row"><label>Climate 1-10</label><input id="nc-climate" type="number" min="1" max="10" placeholder="7" /></div>
       <div class="form-row"><label>Flight hub 1-10</label><input id="nc-hub" type="number" min="1" max="10" placeholder="6" /></div>
       <div class="form-row"><label>English 1-10</label><input id="nc-english" type="number" min="1" max="10" placeholder="7" /></div>
     </div>
@@ -972,15 +977,21 @@ function autofillFromCity() {
   }
 }
 
+// Climate label → 1-10 score (used by builderScore). Mild/warm reward year-round
+// comfort; cold and hot drop; tropical and dry sit in the middle.
+const CLIMATE_SCORE = { mild: 8, warm: 9, cold: 3, hot: 5, tropical: 6, dry: 6 };
+const CLIMATE_LABEL = { mild: 'Mild', warm: 'Warm', cold: 'Cold', hot: 'Hot', tropical: 'Tropical', dry: 'Dry' };
+
 async function submitUserCity() {
   const status = document.getElementById('nc-status');
   const v = id => document.getElementById(id).value.trim();
+  const climateKey = v('nc-climate');
   const body = {
     name: v('nc-name'), country: v('nc-country'), flag: v('nc-flag'),
     visa: v('nc-visa'),
     monthly: v('nc-monthly'), internet: v('nc-internet'),
-    tax_corporate: v('nc-taxcorp'), tax_personal_min: v('nc-taxpmin'), tax_personal_max: v('nc-taxpmax'),
-    talent: v('nc-talent'), community: v('nc-community'), climate: v('nc-climate'),
+    talent: v('nc-talent'),
+    climate: CLIMATE_SCORE[climateKey] ?? 6,
     hub: v('nc-hub'), english: v('nc-english'),
     note: v('nc-note'),
   };
