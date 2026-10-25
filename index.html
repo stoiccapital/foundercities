@@ -78,6 +78,33 @@
     max-width: 300px;
   }
   .search:focus { outline: none; border-color: var(--border-2); }
+  .add-city-btn {
+    background: var(--surface);
+    border: 1px solid var(--border-2);
+    color: var(--text);
+    padding: 9px 14px;
+    border-radius: 7px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+  }
+  .add-city-btn:hover { background: var(--surface-2); border-color: var(--amber); color: var(--amber); }
+  .city-badge-user {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--amber);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 4px;
+    vertical-align: middle;
+  }
 
   .table-wrap {
     background: var(--surface);
@@ -268,7 +295,7 @@
 
   .form-row { margin-bottom: 12px; }
   .form-row label { display: block; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
-  .form-row input, .form-row textarea {
+  .form-row input, .form-row textarea, .form-row select {
     background: var(--surface-2);
     border: 1px solid var(--border-2);
     color: var(--text);
@@ -280,7 +307,7 @@
     box-sizing: border-box;
   }
   .form-row textarea { resize: vertical; min-height: 90px; }
-  .form-row input:focus, .form-row textarea:focus { outline: none; border-color: var(--text); }
+  .form-row input:focus, .form-row textarea:focus, .form-row select:focus { outline: none; border-color: var(--text); }
 
   .form-btn {
     width: 100%;
@@ -333,6 +360,7 @@
 
   <div class="filters">
     <input type="text" class="search" id="search" placeholder="Search city or country…" />
+    <button class="add-city-btn" onclick="openAddCity()">+ Add a city</button>
 
     <div style="display:flex;align-items:center;gap:4px;">
       <span class="filter-label">Visa</span>
@@ -378,7 +406,7 @@
   </div>
 
   <footer>
-    49 cities · opinions baked in · tax data audited Oct 2026 · <a href="https://github.com/stoiccapital" target="_blank">more at stoiccapital</a>
+    <span id="city-count">49</span> cities · opinions baked in · tax data audited Oct 2026 · <a href="https://github.com/stoiccapital" target="_blank">more at stoiccapital</a>
   </footer>
 </div>
 
@@ -488,6 +516,37 @@ CITIES.forEach(c => {
   c.visaScore = visaScore(c.visa);
 });
 
+// ---- User-submitted cities (merged in from API) ----
+// Row from /cities uses snake_case; normalise to the same shape as CITIES so
+// render, sort, and openCity() all keep working without special-casing.
+function normaliseUserCity(r) {
+  const city = {
+    id: `uc-${r.id}`,
+    name: r.name,
+    country: r.country,
+    flag: r.flag || '🏳',
+    monthly: r.monthly,
+    internet: r.internet,
+    taxCorporate: r.tax_corporate ?? 20,
+    taxPersonalMin: r.tax_personal_min ?? 20,
+    taxPersonalMax: r.tax_personal_max ?? r.tax_personal_min ?? 20,
+    taxNote: r.tax_note || 'User-submitted; verify locally.',
+    visa: r.visa || 'medium',
+    visaNote: r.visa_note || 'User-submitted; verify locally.',
+    community: r.community ?? 5,
+    climate: r.climate ?? 5,
+    hub: r.hub ?? 5,
+    english: r.english ?? 5,
+    talent: r.talent ?? 5,
+    note: r.note || '',
+    isUser: true,
+    submittedBy: r.username,
+  };
+  city.score = builderScore(city);
+  city.visaScore = visaScore(city.visa);
+  return city;
+}
+
 // ---- State ----
 const state = {
   sortKey: 'score',
@@ -512,6 +571,8 @@ function render() {
   });
 
   const tbody = document.getElementById('tbody');
+  const countEl = document.getElementById('city-count');
+  if (countEl) countEl.textContent = CITIES.length;
   tbody.innerHTML = rows.map((c, i) => {
     const scoreCls = c.score >= 65 ? 'high' : c.score >= 50 ? 'mid' : 'low';
     return `
@@ -521,7 +582,7 @@ function render() {
           <div class="city-cell">
             <span class="flag">${c.flag}</span>
             <div>
-              <div class="city-name">${c.name}</div>
+              <div class="city-name">${c.name}${c.isUser ? '<span class="city-badge-user">community</span>' : ''}</div>
               <div class="country">${c.country}</div>
             </div>
           </div>
@@ -729,6 +790,86 @@ async function submitCityContribution(cityId) {
 function closeModal() { document.getElementById('modal-overlay').classList.remove('on'); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
+// ---- Add-a-city flow ----
+async function loadUserCities() {
+  try {
+    const res = await apiFetch('/cities');
+    if (!res.ok) return;
+    const list = await res.json();
+    const existingIds = new Set(CITIES.map(c => c.id));
+    for (const r of list) {
+      const uc = normaliseUserCity(r);
+      if (!existingIds.has(uc.id)) CITIES.push(uc);
+    }
+    render();
+  } catch {}
+}
+
+function openAddCity() {
+  if (!currentUser) { openAuth(); return; }
+  const el = document.getElementById('auth-modal');
+  el.innerHTML = `
+    <div class="modal-head">
+      <div><h2 style="margin:0;">Add a city</h2>
+        <div class="modal-sub">Share one that's missing. Scored with the same formula.</div></div>
+      <button class="modal-close" onclick="closeAuth()">×</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-row"><label>City *</label><input id="nc-name" placeholder="e.g. Porto" maxlength="48" /></div>
+      <div class="form-row"><label>Country *</label><input id="nc-country" placeholder="e.g. Portugal" maxlength="48" /></div>
+      <div class="form-row"><label>Flag emoji</label><input id="nc-flag" placeholder="🇵🇹" maxlength="8" /></div>
+      <div class="form-row"><label>Visa path</label>
+        <select id="nc-visa">
+          <option value="easy">easy</option>
+          <option value="medium" selected>medium</option>
+          <option value="hard">hard</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Monthly cost (USD) *</label><input id="nc-monthly" type="number" placeholder="1500" /></div>
+      <div class="form-row"><label>Internet (Mbps) *</label><input id="nc-internet" type="number" placeholder="100" /></div>
+      <div class="form-row"><label>Corporate tax %</label><input id="nc-taxcorp" type="number" step="0.1" placeholder="21" /></div>
+      <div class="form-row"><label>Personal tax min %</label><input id="nc-taxpmin" type="number" step="0.1" placeholder="14" /></div>
+      <div class="form-row"><label>Personal tax max %</label><input id="nc-taxpmax" type="number" step="0.1" placeholder="48" /></div>
+      <div class="form-row"><label>Talent 1-10</label><input id="nc-talent" type="number" min="1" max="10" placeholder="6" /></div>
+      <div class="form-row"><label>Community 1-10</label><input id="nc-community" type="number" min="1" max="10" placeholder="6" /></div>
+      <div class="form-row"><label>Climate 1-10</label><input id="nc-climate" type="number" min="1" max="10" placeholder="7" /></div>
+      <div class="form-row"><label>Flight hub 1-10</label><input id="nc-hub" type="number" min="1" max="10" placeholder="6" /></div>
+      <div class="form-row"><label>English 1-10</label><input id="nc-english" type="number" min="1" max="10" placeholder="7" /></div>
+    </div>
+    <div class="form-row"><label>Short note</label><textarea id="nc-note" placeholder="One sentence — why would a founder consider it?" maxlength="500"></textarea></div>
+    <button class="form-btn" onclick="submitUserCity()">Add city</button>
+    <div class="form-status" id="nc-status"></div>
+  `;
+  document.getElementById('auth-overlay').classList.add('on');
+}
+
+async function submitUserCity() {
+  const status = document.getElementById('nc-status');
+  const v = id => document.getElementById(id).value.trim();
+  const body = {
+    name: v('nc-name'), country: v('nc-country'), flag: v('nc-flag'),
+    visa: v('nc-visa'),
+    monthly: v('nc-monthly'), internet: v('nc-internet'),
+    tax_corporate: v('nc-taxcorp'), tax_personal_min: v('nc-taxpmin'), tax_personal_max: v('nc-taxpmax'),
+    talent: v('nc-talent'), community: v('nc-community'), climate: v('nc-climate'),
+    hub: v('nc-hub'), english: v('nc-english'),
+    note: v('nc-note'),
+  };
+  if (!body.name || !body.country || !body.monthly || !body.internet) {
+    status.textContent = 'City, country, monthly, and internet are required.'; status.className = 'form-status err'; return;
+  }
+  status.textContent = 'Saving…'; status.className = 'form-status';
+  const res = await apiFetch('/city', { method: 'POST', body: JSON.stringify(body) });
+  if (res.ok) {
+    status.textContent = 'Added. Reloading…'; status.className = 'form-status ok';
+    await loadUserCities();
+    setTimeout(() => closeAuth(), 700);
+  } else {
+    const d = await res.json();
+    status.textContent = d.error || 'Failed'; status.className = 'form-status err';
+  }
+}
+
 render();
 
 // ========= Auth + Feedback =========
@@ -881,6 +1022,7 @@ async function loadFeedback() {
 function escHTML(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 refreshMe();
+loadUserCities();
 </script>
 </body>
 </html>
