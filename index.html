@@ -402,9 +402,7 @@
           <th class="num" data-k="taxPersonalMax">Pers tax %<span class="arrow">↕</span></th>
           <th class="num" data-k="visaScore">Visa<span class="arrow">↕</span></th>
           <th class="num" data-k="talent">Talent<span class="arrow">↕</span></th>
-          <th class="num" data-k="community">Community<span class="arrow">↕</span></th>
           <th class="num" data-k="climate">Climate<span class="arrow">↕</span></th>
-          <th class="num" data-k="hub">Hub<span class="arrow">↕</span></th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -699,9 +697,7 @@ function render() {
         <td class="num" data-label="Pers tax">${c.taxPersonalMin === c.taxPersonalMax ? c.taxPersonalMax + ' %' : c.taxPersonalMin + '-' + c.taxPersonalMax + ' %'}</td>
         <td class="num" data-label="Visa"><span class="pill visa-${c.visa}">${c.visa}</span></td>
         <td class="num" data-label="Talent">${c.talent}</td>
-        <td class="num" data-label="Community">${c.community}</td>
         <td class="num" data-label="Climate">${c.climate}</td>
-        <td class="num" data-label="Hub">${c.hub}</td>
       </tr>
     `;
   }).join('');
